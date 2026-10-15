@@ -6,7 +6,7 @@ import (
 )
 
 // Go's flag package stops parsing at the first non-flag argument, so flags
-// written after the query were silently swallowed as file paths — `jev find
+// written after the query were silently swallowed as file paths — `systemone find
 // "x" --min 0.9` ran with the default threshold and no warning.
 func TestPermuteMovesFlagsAhead(t *testing.T) {
 	for _, tc := range []struct {

@@ -1,4 +1,4 @@
-# Results — `jev ask`
+# Results — `systemone ask`
 
 Nine questions across three repositories, each applied to every file in a
 declared scope (12-34 files). Unlike the search benchmark this is a **per-file
@@ -8,7 +8,7 @@ that flags fifteen innocent files to catch three real ones does not get used
 twice.
 
 Labels were written by agents that read the code and were forbidden from running
-`jev`. Each was required to label *every* file in scope, not just the positives,
+`systemone`. Each was required to label *every* file in scope, not just the positives,
 and to supply the regex a competent developer would plausibly try first — so the
 grep baseline is their good-faith attempt, not one I wrote to lose.
 
@@ -21,11 +21,11 @@ At the tool's threshold as shipped when measured (0.7):
 | method | precision | recall | F1 |
 |---|---|---|---|
 | grep | 0.74 | 0.96 | 0.81 |
-| **jev** | **1.00** | 0.96 | **0.97** |
+| **systemone** | **1.00** | 0.96 | **0.97** |
 
 By question kind (F1):
 
-| kind | grep | jev |
+| kind | grep | systemone |
 |---|---|---|
 | syntactic — basically greppable | 0.90 | **1.00** |
 | semantic — needs reading the code | 0.82 | **0.92** |
@@ -35,7 +35,7 @@ The shape matches the search benchmark. On greppable properties a regex is a
 real competitor. The gap opens on rare properties, where grep's false alarms
 dominate: on "which file mints a session token pair", grep returned 4 wrong
 files for 2 right ones (P=0.33); on "insecure production default", 2 wrong for
-2 right (P=0.50). **jev produced no false positive anywhere in the benchmark.**
+2 right (P=0.50). **systemone produced no false positive anywhere in the benchmark.**
 
 ## Where the threshold sits
 
@@ -91,7 +91,7 @@ than `find`, because a scope is a directory rather than a repository.
 
 - Nine questions, three repositories, one labeller each. "Does this file itself
   check a secret, as opposed to relying on middleware" is a judgment call, and
-  the two files jev scored lowest on that question are exactly the arguable ones.
+  the two files systemone scored lowest on that question are exactly the arguable ones.
 - Scopes are hand-picked directories of 12-34 files. Behaviour over a scope of
   500 files is untested, and the threshold may not hold there — more files means
   more chances for one to land in the empty middle.

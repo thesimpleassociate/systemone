@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/borislemeec/jev/internal/typesafe"
+	"github.com/thesimpleassociate/systemone/internal/decision"
 )
 
 func absPath(p string) (string, error) { return filepath.Abs(p) }
@@ -25,7 +25,7 @@ func Probe(args []string) error {
 		return err
 	}
 
-	client, err := typesafe.New()
+	client, err := decision.New()
 	if err != nil {
 		return err
 	}
@@ -39,10 +39,10 @@ func Probe(args []string) error {
 	}
 
 	fmt.Println("== raw response ==")
-	resp, err := client.Ask(context.Background(), state, map[string]typesafe.Question{
-		"noul":   typesafe.Noul("Does the code in `file.content` change how an image is oriented?"),
-		"choice": typesafe.Choice("What does the code in `file.content` mainly do?", map[string]string{"images": "Processes or transforms images", "network": "Sends or receives data over a network", "storage": "Reads or writes a database"}),
-		"score":  typesafe.Score("How much of the work is visible in `file.content`?", []string{"Only a signature, no body", "A partial implementation", "The complete implementation"}),
+	resp, err := client.Ask(context.Background(), state, map[string]decision.Question{
+		"noul":   decision.Noul("Does the code in `file.content` change how an image is oriented?"),
+		"choice": decision.Choice("What does the code in `file.content` mainly do?", map[string]string{"images": "Processes or transforms images", "network": "Sends or receives data over a network", "storage": "Reads or writes a database"}),
+		"score":  decision.Score("How much of the work is visible in `file.content`?", []string{"Only a signature, no body", "A partial implementation", "The complete implementation"}),
 	})
 	if err != nil {
 		return err
@@ -63,11 +63,11 @@ func Probe(args []string) error {
 
 	fmt.Println("\nCheck each decoded row against the raw JSON above. A field that")
 	fmt.Println("stayed zero where the raw body has a value means the struct tag in")
-	fmt.Println("internal/typesafe/client.go needs renaming to match.")
+	fmt.Println("internal/decision/client.go needs renaming to match.")
 	return nil
 }
 
-const probeUsage = `usage: jev probe
+const probeUsage = `usage: systemone probe
 
 Sends one small request using all three primitives and prints the raw JSON
 alongside what this tool decoded from it. Use it to verify the API contract

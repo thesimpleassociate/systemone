@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Compare jev against lexical baselines on labelled retrieval queries.
+"""Compare systemone against lexical baselines on labelled retrieval queries.
 
-Every method ranks the same corpus — the file set `jev scan --list` reports — so
+Every method ranks the same corpus — the file set `systemone scan --list` reports — so
 differences come from ranking, not from what each tool chose to look at.
 
 Baselines:
@@ -10,7 +10,7 @@ Baselines:
   bm25  a real lexical IR ranker, the standard retrieval baseline. Identifiers
         are split on camelCase and underscores so `apiSignup` matches "signup".
 
-Usage: bench.py queries/*.json [--methods grep,bm25,jev] [--k 5]
+Usage: bench.py queries/*.json [--methods grep,bm25,systemone] [--k 5]
 """
 import functools, json, math, os, re, subprocess, sys, time
 from collections import Counter, defaultdict
@@ -19,8 +19,8 @@ from collections import Counter, defaultdict
 # when redirected to a file.
 print = functools.partial(__builtins__.print, flush=True)
 
-JEV = os.environ.get("JEV_BIN", "jev")
-USAGE_LOG = os.path.expanduser("~/.jev/usage.jsonl")
+SYSTEMONE = os.environ.get("SYSTEMONE_BIN", "systemone")
+USAGE_LOG = os.path.expanduser("~/.systemone/usage.jsonl")
 
 STOP = {"the","a","an","is","are","where","how","what","which","does","do","in","of","to","and","or",
         "for","on","at","by","with","this","that","it","its","from","when","code","file","files",
@@ -39,7 +39,7 @@ def words(text):
     return out
 
 def corpus(repo):
-    out = subprocess.run([JEV, "scan", "--list"], cwd=repo, capture_output=True, text=True)
+    out = subprocess.run([SYSTEMONE, "scan", "--list"], cwd=repo, capture_output=True, text=True)
     return [p for p in out.stdout.splitlines() if p.strip()]
 
 # ---- methods: each returns a ranked list of paths ----
@@ -99,27 +99,27 @@ def m_bm25(repo, query, files, k, k1=1.5, b=0.75):
     scored.sort(reverse=True)
     return [f for _, f in scored[:k]]
 
-def _jev(repo, query, k, extra):
-    r = subprocess.run([JEV, "find", "--json", "--min", "0", "-n", str(k), "--locate", "0"] + extra + [query],
+def _systemone(repo, query, k, extra):
+    r = subprocess.run([SYSTEMONE, "find", "--json", "--min", "0", "-n", str(k), "--locate", "0"] + extra + [query],
                        cwd=repo, capture_output=True, text=True)
     try:
         d = json.loads(r.stdout)
     except json.JSONDecodeError:
-        sys.stderr.write(f"  jev failed on {query!r}: {r.stderr.strip()[:200]}\n")
+        sys.stderr.write(f"  systemone failed on {query!r}: {r.stderr.strip()[:200]}\n")
         return []
     return [(m["path"], m["score"]) for m in d.get("matches", [])]
 
-def m_jev(repo, query, files, k):
+def m_systemone(repo, query, files, k):
     """The shipping configuration: screen every file, verify the leaders."""
-    return _jev(repo, query, k, [])
+    return _systemone(repo, query, k, [])
 
-def m_jev_screen(repo, query, files, k):
+def m_systemone_screen(repo, query, files, k):
     """Ablation: skeleton screen only, no full-content verify pass."""
-    return _jev(repo, query, k, ["--verify", "0"])
+    return _systemone(repo, query, k, ["--verify", "0"])
 
-METHODS = {"grep": m_grep, "bm25": m_bm25, "jev": m_jev, "jev_screen": m_jev_screen}
-JEV_METHODS = {"jev", "jev_screen"}
-JEV_THRESHOLD = 0.6   # the tool's default --min
+METHODS = {"grep": m_grep, "bm25": m_bm25, "systemone": m_systemone, "systemone_screen": m_systemone_screen}
+SYSTEMONE_METHODS = {"systemone", "systemone_screen"}
+SYSTEMONE_THRESHOLD = 0.6   # the tool's default --min
 
 # ---- metrics ----
 
@@ -159,7 +159,7 @@ def usage_since(offset):
 def main():
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     opts = {a.split("=")[0]: a.split("=", 1)[1] for a in sys.argv[1:] if "=" in a and a.startswith("--")}
-    methods = opts.get("--methods", "grep,bm25,jev").split(",")
+    methods = opts.get("--methods", "grep,bm25,systemone").split(",")
     k = int(opts.get("--k", 5))
 
     agg = defaultdict(lambda: defaultdict(list))   # method -> category -> [(p1, rec, rr)]
@@ -182,11 +182,11 @@ def main():
                 t0 = time.time()
                 out = METHODS[m](repo, q["query"], files, k)
                 timing[m] += time.time() - t0
-                if m in JEV_METHODS:
+                if m in SYSTEMONE_METHODS:
                     tokens[m] += usage_since(off)
                     ranked_all = out
                     ranked = [p for p, s in ranked_all]
-                    shown = [p for p, s in ranked_all if s >= JEV_THRESHOLD]
+                    shown = [p for p, s in ranked_all if s >= SYSTEMONE_THRESHOLD]
                 else:
                     ranked = out
                     shown = out
@@ -223,7 +223,7 @@ def main():
 
     print("\ncost and latency (whole run)")
     for m in methods:
-        extra = f"   {tokens[m]:,} tokens  ${tokens[m]*0.042/1e6:.4f}" if m in JEV_METHODS else ""
+        extra = f"   {tokens[m]:,} tokens  ${tokens[m]*0.042/1e6:.4f}" if m in SYSTEMONE_METHODS else ""
         print(f"  {m:<6} {timing[m]:>7.1f}s{extra}")
 
     with open("bench_results.json", "w") as fh:

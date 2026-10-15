@@ -14,9 +14,9 @@ Usage: bench_lint.py diffs_*.json
 import json, os, re, subprocess, sys
 from collections import defaultdict
 
-JEV = os.environ.get("JEV_BIN", "jev")
-# The repository whose .jev-rules.json the diffs are judged against.
-REPO = os.environ.get("JEV_BENCH_REPO", os.getcwd())
+SYSTEMONE = os.environ.get("SYSTEMONE_BIN", "systemone")
+# The repository whose .systemone-rules.json the diffs are judged against.
+REPO = os.environ.get("SYSTEMONE_BENCH_REPO", os.getcwd())
 
 # Must match defaultLintThreshold in internal/run/lint.go.
 THRESH = 0.60
@@ -28,12 +28,12 @@ def score(case):
                "tool_input": {"file_path": os.path.join(REPO, case["path"]),
                               "old_string": case.get("before", ""),
                               "new_string": case["after"]}}
-    r = subprocess.run([JEV, "lint", "edit"], input=json.dumps(payload),
+    r = subprocess.run([SYSTEMONE, "lint", "edit"], input=json.dumps(payload),
                        capture_output=True, text=True,
-                       env=dict(os.environ, JEV_LINT_DEBUG="1"))
+                       env=dict(os.environ, SYSTEMONE_LINT_DEBUG="1"))
     out = {}
     for line in r.stderr.splitlines():
-        if m := re.match(r"jev lint:\s+(\S+)\s+([0-9.]+)$", line):
+        if m := re.match(r"systemone lint:\s+(\S+)\s+([0-9.]+)$", line):
             out[m.group(1)] = float(m.group(2))
     fired = "additionalContext" in (r.stdout or "")
     return out, fired

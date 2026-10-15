@@ -1,7 +1,7 @@
 # Results — the semantic lint
 
 A `PostToolUse` hook on `Edit`/`Write` that checks a change against the
-project's own written conventions, declared in `.jev-rules.json` at the
+project's own written conventions, declared in `.systemone-rules.json` at the
 repository root.
 
 It is the opposite of the Read hook in the way that matters: it only ever **adds
@@ -16,7 +16,7 @@ accordingly.
 ## Quality
 
 27 labelled changes against three rules taken from the project's own `CLAUDE.md`,
-written by agents that read the codebase and were forbidden from running `jev`.
+written by agents that read the codebase and were forbidden from running `systemone`.
 **11 of the 27 are near-misses**: changes that touch the same ground without
 breaking the rule, which is where a keyword matcher fails and where this has to
 earn its place.
@@ -46,7 +46,7 @@ The near-misses it saw through:
 
 ## The threshold is measured
 
-`jev ask`'s 0.5 fires on the English-comment near-miss at 0.51 on this set — one
+`systemone ask`'s 0.5 fires on the English-comment near-miss at 0.51 on this set — one
 false alarm, precision 0.89 — so the lint sets its own.
 
 | threshold | P | R | F1 | false alarms |

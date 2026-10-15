@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/borislemeec/jev/internal/typesafe"
+	"github.com/thesimpleassociate/systemone/internal/decision"
 )
 
 // Hook narrows a Read of a very large file to the window that answers what the
@@ -23,7 +23,7 @@ import (
 // costs far more than a noisy false positive. Every decision below is therefore
 // biased toward doing nothing:
 //
-//   - off entirely when JEV_HOOK_DISABLE is set
+//   - off entirely when SYSTEMONE_HOOK_DISABLE is set
 //   - only files above a measured line floor
 //   - only when an explicit offset or limit was not already given
 //   - only when the model is confident the answer really is in one place
@@ -48,11 +48,11 @@ type hookSpecific struct {
 }
 
 // passThrough emits the empty decision: the read proceeds exactly as written.
-// The reason goes to stderr under JEV_HOOK_DEBUG — a hook that silently does
+// The reason goes to stderr under SYSTEMONE_HOOK_DEBUG — a hook that silently does
 // nothing is impossible to tell apart from a hook that is broken.
 func passThrough(reason string) error {
-	if os.Getenv("JEV_HOOK_DEBUG") != "" {
-		fmt.Fprintf(os.Stderr, "jev hook: passing through (%s)\n", reason)
+	if os.Getenv("SYSTEMONE_HOOK_DEBUG") != "" {
+		fmt.Fprintf(os.Stderr, "systemone hook: passing through (%s)\n", reason)
 	}
 	return json.NewEncoder(os.Stdout).Encode(hookOutput{})
 }
@@ -66,13 +66,13 @@ func envInt(name string, def int) int {
 
 func Hook(args []string) error {
 	if len(args) == 0 || args[0] != "read" {
-		return fmt.Errorf("usage: jev hook read   (reads a PreToolUse payload on stdin)")
+		return fmt.Errorf("usage: systemone hook read   (reads a PreToolUse payload on stdin)")
 	}
-	// On by default. JEV_HOOK_DISABLE is the escape hatch: one variable turns
+	// On by default. SYSTEMONE_HOOK_DISABLE is the escape hatch: one variable turns
 	// every narrowing off without uninstalling anything, which is what you want
 	// reaching for when a read looks like it lost something.
-	if strings.TrimSpace(os.Getenv("JEV_HOOK_DISABLE")) != "" {
-		return passThrough("JEV_HOOK_DISABLE is set")
+	if strings.TrimSpace(os.Getenv("SYSTEMONE_HOOK_DISABLE")) != "" {
+		return passThrough("SYSTEMONE_HOOK_DISABLE is set")
 	}
 
 	var in hookInput
@@ -100,7 +100,7 @@ func Hook(args []string) error {
 		return passThrough("unreadable file")
 	}
 	lines := strings.Count(string(data), "\n") + 1
-	minLines := envInt("JEV_HOOK_MIN_LINES", 400)
+	minLines := envInt("SYSTEMONE_HOOK_MIN_LINES", 400)
 	if lines < minLines {
 		return passThrough(fmt.Sprintf("file is %d lines, under the %d-line floor", lines, minLines))
 	}
@@ -120,7 +120,7 @@ func Hook(args []string) error {
 		return passThrough("no goal found in the transcript")
 	}
 
-	client, err := typesafe.New()
+	client, err := decision.New()
 	if err != nil {
 		return passThrough("no API key")
 	}
@@ -135,7 +135,7 @@ func Hook(args []string) error {
 	// sides — but it rests on a single observed failure, so it is deliberately
 	// far above the highest confidence ever seen to fail.
 	minConf := 0.60
-	if v, err := strconv.ParseFloat(strings.TrimSpace(os.Getenv("JEV_HOOK_MIN_CONF")), 64); err == nil && v > 0 {
+	if v, err := strconv.ParseFloat(strings.TrimSpace(os.Getenv("SYSTEMONE_HOOK_MIN_CONF")), 64); err == nil && v > 0 {
 		minConf = v
 	}
 	if got.Conf < minConf {
@@ -173,7 +173,7 @@ func Hook(args []string) error {
 			},
 		},
 		AdditionalContext: fmt.Sprintf(
-			"jev narrowed this Read: %s is %d lines, showing %d-%d (match at line %d, confidence %.2f). "+
+			"systemone narrowed this Read: %s is %d lines, showing %d-%d (match at line %d, confidence %.2f). "+
 				"Read it again with an explicit offset or limit to see any other part — nothing was removed from the file.",
 			filepath.Base(path), lines, offset, offset+window-1, got.Line, got.Conf),
 	})

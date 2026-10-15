@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Paired agent runs: same task, grep-only vs jev-first, measured from transcripts."""
+"""Paired agent runs: same task, grep-only vs systemone-first, measured from transcripts."""
 import json, os, re, sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from agentstats import stats
 
-T = os.environ["JEV_BENCH_TASKS"]  # directory of agent transcripts (.output JSONL)
+T = os.environ["SYSTEMONE_BENCH_TASKS"]  # directory of agent transcripts (.output JSONL)
 runs = json.load(open(os.path.join(os.path.dirname(__file__), "runs.json")))
 
 def answer(agent_id):
@@ -40,7 +40,7 @@ rows = []
 print(f"{'task':<34}{'arm':<6}{'billed':>10}{'ctx':>8}{'turns':>7}{'calls':>7}{'recall':>9}")
 print("-" * 82)
 for t in runs["tasks"]:
-    for arm in ("grep", "jev"):
+    for arm in ("grep", "systemone"):
         st = stats(f"{T}/{t[arm]}.output")
         got = answer(t[arm])
         label, rec = score(got, t["truth"])
@@ -58,12 +58,12 @@ def agg(arm, kind=None):
 
 print("=" * 82)
 print(f"{'arm':<8}{'n':>3}{'billed avg':>13}{'ctx avg':>10}{'turns':>8}{'calls':>8}{'recall':>9}")
-for arm in ("grep", "jev"):
+for arm in ("grep", "systemone"):
     a = agg(arm)
     print(f"{arm:<8}{a['n']:>3}{a['billed']:>13,.0f}{a['ctx']:>10,.0f}{a['turns']:>8.1f}{a['calls']:>8.1f}{a['rec']:>9.2f}")
 
-g, j = agg("grep"), agg("jev")
-print(f"\njev vs grep-only:")
+g, j = agg("grep"), agg("systemone")
+print(f"\nsystemone vs grep-only:")
 for k, name in (("billed", "billed input tokens"), ("ctx", "tokens into context"),
                 ("turns", "turns"), ("calls", "tool calls")):
     d = 100 * (j[k] - g[k]) / g[k]
@@ -72,10 +72,10 @@ print(f"  recall                {g['rec']:>10.2f} -> {j['rec']:>9.2f}")
 
 print("\nby task kind (billed input tokens):")
 for kind in ("vocab_gap", "ordinary", "negative"):
-    gg, jj = agg("grep", kind), agg("jev", kind)
+    gg, jj = agg("grep", kind), agg("systemone", kind)
     if gg["n"]:
         d = 100 * (jj["billed"] - gg["billed"]) / gg["billed"]
-        print(f"  {kind:<12} n={gg['n']}  grep {gg['billed']:>9,.0f}  jev {jj['billed']:>9,.0f}  {d:+6.1f}%"
+        print(f"  {kind:<12} n={gg['n']}  grep {gg['billed']:>9,.0f}  systemone {jj['billed']:>9,.0f}  {d:+6.1f}%"
               f"   recall {gg['rec']:.2f} -> {jj['rec']:.2f}")
 
 json.dump(rows, open(os.path.join(os.path.dirname(__file__), "results.json"), "w"), indent=1)
@@ -83,4 +83,4 @@ json.dump(rows, open(os.path.join(os.path.dirname(__file__), "results.json"), "w
 # runs.json / runs_ask.json map each task to the two agent transcripts that ran
 # it. They are not published: they name private repositories and reference
 # transcripts that exist only on the machine that produced them. The shape is
-# {"tasks": [{"task", "truth": [...], "grep": "<agent-id>", "jev": "<agent-id>"}]}.
+# {"tasks": [{"task", "truth": [...], "grep": "<agent-id>", "systemone": "<agent-id>"}]}.

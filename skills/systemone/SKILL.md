@@ -1,20 +1,20 @@
 ---
-name: jev
+name: systemone
 description: >
   Find code by describing what it does, and ask yes/no questions about files,
   without reading those files into context. Use when locating a feature, flow or
   concept whose name in the codebase is unknown or may differ from the words in
   the request ("where is the register flow", "which files touch rate limiting"),
   when a grep returned nothing useful, or when checking a property across many
-  files would otherwise mean reading all of them. Backed by the TypeSafe Jev
-  model at $0.042 per million tokens; it reads the files so the agent does not.
+  files would otherwise mean reading all of them. Backed by Microsoft-Decision-1
+  in Microsoft Foundry; it reads the files so the agent does not.
 ---
 
-# jev — ask about code without reading it
+# systemone — ask about code without reading it
 
 Context is not paid for once. Every file read early in a session is re-sent with
 every later request, so a 3k-token file read with 100 turns to go costs roughly
-300k tokens before the session ends. `jev` reads files itself, sends them to a
+300k tokens before the session ends. `systemone` reads files itself, sends them to a
 model that costs ~120× less than reading them here, and returns a few lines.
 
 Scanning a 400 KB repository costs about **$0.0025** and adds about **40 tokens**
@@ -23,16 +23,16 @@ to this context.
 ## Commands
 
 ```bash
-jev find "<what you are looking for>" [path...]   # rank files, with line numbers
-jev ask "<yes/no question>" <file|dir...>          # per-file probability + line
-jev scan [path...]                                 # dry run: cost, no API call
-jev gain                                           # what it has cost so far
+systemone find "<what you are looking for>" [path...]   # rank files, with line numbers
+systemone ask "<yes/no question>" <file|dir...>          # per-file probability + line
+systemone scan [path...]                                 # dry run: cost, no API call
+systemone gain                                           # what it has cost so far
 ```
 
 ### find
 
 ```
-$ jev find "where is the register flow"
+$ systemone find "where is the register flow"
 130 files scanned, 3 match:
   0.94  internal/app/api.go:120
   0.91  web/templates/join.html:14
@@ -50,8 +50,8 @@ it. Measured on a 127-file repository:
 
 | | files | time |
 |---|---:|---:|
-| `jev find "…"` | 127 | 9.4 s |
-| `jev find "…" internal/` | 8 | **2.5 s** |
+| `systemone find "…"` | 127 | 9.4 s |
+| `systemone find "…" internal/` | 8 | **2.5 s** |
 
 About 2 s of that is a floor — the verify and locate passes — so narrowing below
 a handful of files buys nothing. Scope on what the request already tells you: a
@@ -62,7 +62,7 @@ search, which is worse than the seconds it saved.
 ### ask
 
 ```
-$ jev ask "does this build a SQL query by string concatenation?" internal/ -q
+$ systemone ask "does this build a SQL query by string concatenation?" internal/ -q
   0.88  yes     internal/app/store.go:212
 ```
 
@@ -90,10 +90,10 @@ bimodal: true files land at 0.92-0.99, false ones at 0.02-0.13.
 ## When not to use it
 
 - **An exact symbol you know the name of.** `Grep` is free, instant and exact.
-  Reach for `jev` when the *name* is the unknown, not the location.
+  Reach for `systemone` when the *name* is the unknown, not the location.
 - **When the file must be read anyway** to edit it. Locating it is the win;
   editing still needs the real content.
-- **As a source of explanations.** Jev returns numbers, never prose. It says
+- **As a source of explanations.** Systemone returns numbers, never prose. It says
   *where* and *how likely*, never *why*. Do not describe its output as reasoning.
 
 ## Reading the scores
@@ -130,8 +130,12 @@ is never second-guessed. Measured: 50 narrowed windows, none lost its target.
 
 ## Setup
 
-Needs `TYPE_SAFE_AI_KEY` in the environment. If a command reports a missing key,
-tell the user rather than falling back to reading every file silently.
+Needs `SYSTEMONE_ENDPOINT` (the Foundry decision API URL) set in the environment.
+Authenticates with Microsoft Entra ID through the Azure CLI: the user must have run
+`az login` and hold the Cognitive Services User role on the Foundry resource. If a
+command reports a 401 or a failed token fetch, tell the user rather than falling
+back to reading every file silently. (`SYSTEMONE_AUTH=key` with `SYSTEMONE_API_KEY`
+switches to an API key.)
 
-Run `jev probe` once after installing to confirm the API contract, and
-`jev scan` to see what a search would send and cost without sending it.
+Run `systemone probe` once after installing to confirm the API contract, and
+`systemone scan` to see what a search would send and cost without sending it.
