@@ -80,7 +80,7 @@ func TestHookPassesThrough(t *testing.T) {
 			"tool_name": "Read", "tool_input": map[string]any{"file_path": big}, "transcript_path": ""}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			t.Setenv("JEV_HOOK_DISABLE", tc.disable)
+			t.Setenv("SYSTEMONE_HOOK_DISABLE", tc.disable)
 			got := runHook(t, tc.payload)
 			if got.HookSpecificOutput != nil && got.HookSpecificOutput.UpdatedInput != nil {
 				t.Errorf("hook rewrote the read but should have passed it through: %+v",

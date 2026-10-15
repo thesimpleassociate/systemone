@@ -31,7 +31,7 @@ def locate(c):
         i = s // size
         chunks[f"c{i}"] = {"start_line": s + 1, "text": "\n".join(lines[s:e])}
         crit[f"c{i}"] = f"lines {s+1}-{e}"
-    body = {"model": "jev-latest",
+    body = {"model": "systemone-latest",
             "state": {"goal": c["goal"], "file": {"path": c["file"], "chunks": chunks}},
             "questions": {"where": {"type": "choice", "instructions": LOC, "criteria": crit}}}
     req = urllib.request.Request("https://api.typesafe.ai/v1/systemone",

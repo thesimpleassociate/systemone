@@ -3,9 +3,9 @@
 Read from the timestamps the paired agent runs already left behind, so this
 costs nothing and measures the same runs the token numbers came from.
 
-| | baseline | with jev | |
+| | baseline | with systemone | |
 |---|---:|---:|---|
-| `find` (grep-only vs jev-first), 7 pairs | 57 s | 39 s | −32% mean |
+| `find` (grep-only vs systemone-first), 7 pairs | 57 s | 39 s | −32% mean |
 | `ask` (grep-only vs ask-first), 3 pairs | 52 s | 51 s | −3% |
 | Read hook (whole file vs window), 3 pairs | 9 s | 9 s | −6% |
 
@@ -22,7 +22,7 @@ So the honest statement is:
 > **These tools save tokens, not time.** Wall-clock is a wash, except when the
 > baseline would otherwise flounder — and then the difference is large.
 
-That follows from the mechanics rather than contradicting them. A `jev find`
+That follows from the mechanics rather than contradicting them. A `systemone find`
 call costs ~13 s and removes two or three turns; a turn takes about that long.
 The tokens those turns would have parked in context are gone for good, but the
 clock barely notices.
@@ -31,8 +31,8 @@ clock barely notices.
 
 | | |
 |---|---|
-| `jev find` | ~13 s (one request per file, plus a verify pass) |
-| `jev ask` | ~2 s per question over a directory |
+| `systemone find` | ~13 s (one request per file, plus a verify pass) |
+| `systemone ask` | ~2 s per question over a directory |
 | Read hook | ~1.25 s, synchronous, added to a narrowed read |
 | lint | ~0.73 s, **async**, so nothing waits on it |
 

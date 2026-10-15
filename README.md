@@ -1,19 +1,23 @@
-# jev
+# systemone
 
 **Answer questions about a codebase without reading it into the agent's context.**
 
-A Claude Code plugin backed by [TypeSafe](https://typesafe.ai)'s Jev — a small
-model that returns calibrated probabilities instead of prose, at $0.042 per
-million tokens. It reads your files so the agent doesn't have to.
+A Claude Code plugin backed by Microsoft-Decision-1 in Microsoft Foundry — a small
+model that returns calibrated probabilities instead of prose. It reads your files
+so the agent doesn't have to.
 
-![jev intercepting a Claude Code session](docs/demo.gif)
+Forked from [BorisLeMeec/jev](https://github.com/BorisLeMeec/jev) (MIT), which
+targets the TypeSafe API. The benchmark and cost figures below were measured
+against that backend, not Decision-1.
+
+![systemone intercepting a Claude Code session](docs/demo.gif)
 
 *Every turn is checked. Only searches and large reads are taken over — an
 `Update`, a `Bash`, a file under 400 lines pass straight through. The panels
 in it are a diagram, not the UI: the plugin is a hook and draws nothing.*
 
 ```
-$ jev find "where is the register flow"
+$ systemone find "where is the register flow"
 127 files scanned, 4 match:
   0.95  internal/app/api.go:81
   0.95  mobile/lib/screens/join.dart:71
@@ -29,26 +33,77 @@ That repository contains the string `register` **zero times**. The flow is calle
 
 ## Install
 
-Needs Go 1.22+ and a [TypeSafe API key](https://typesafe.ai).
+Needs the [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli),
+`curl`, `bash` (Git Bash on Windows), and access to the Foundry resource. Go is
+only needed to build from source.
 
 ```bash
-claude plugin marketplace add BorisLeMeec/jev
-claude plugin install jev@jev
+claude plugin marketplace add thesimpleassociate/systemone
+claude plugin install systemone@systemone
 ```
 
-Then, once:
+The plugin ships a launcher, `bin/systemone`, not a binary. On first use it
+downloads the release binary for your OS and architecture that matches the plugin
+version, checks it against the release's `checksums.txt`, and caches it in
+`bin/.cache/`. If the download fails the Read hook passes through, so a Read is
+never blocked; direct commands exit with the error.
+
+### Releasing
+
+Binaries come from `.github/workflows/release.yml`. To publish a version, bump
+`version` in `.claude-plugin/plugin.json`, merge, then tag it:
 
 ```bash
-export TYPE_SAFE_AI_KEY=...   # put this in your shell profile
+git tag v0.2.0 && git push origin v0.2.0
 ```
 
-To use `jev` from your own terminal too (the plugin only puts it on `PATH`
+The workflow refuses a tag that doesn't match `plugin.json`, builds
+windows/linux/darwin (amd64 and arm64), and attaches the binaries and
+`checksums.txt` to the release. Tag before teammates update the plugin, or their
+first run can't find a matching binary.
+
+### Authentication (Microsoft Entra ID)
+
+No API key is needed. `systemone` gets a token from the Azure CLI
+(`az account get-access-token --resource https://cognitiveservices.azure.com`),
+caches it under your user cache directory (`systemone/entra-token.json`) and
+refreshes it shortly before it expires.
+
+Once per machine:
+
+```bash
+az login
+export SYSTEMONE_ENDPOINT=https://<resource>.services.ai.azure.com/providers/microsoft/v1/systemone
+```
+
+Put the export in your shell profile (on Windows, `setx SYSTEMONE_ENDPOINT ...`).
+There is no built-in default; without it every command fails with `no endpoint`.
+
+Your Entra identity must hold the **Cognitive Services User** role on the Foundry
+resource. Without it every call fails with
+`401 unauthorized`; ask an admin to add you to the group that has the role.
+
+### Configuration
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `SYSTEMONE_ENDPOINT` | **required** (or `AZURE_ENDPOINT`) | full decision API URL, `https://<resource>.services.ai.azure.com/providers/microsoft/v1/systemone` |
+| `AZURE_ENDPOINT` | — | alternative to the above: Foundry resource base URL; `/providers/microsoft/v1/systemone` is appended |
+| `SYSTEMONE_MODEL` | `Decision-1` | the Foundry **deployment name**, not the model name |
+| `SYSTEMONE_AUTH` | `entra` | set to `key` to send an API key in the `api-key` header instead |
+| `SYSTEMONE_API_KEY` / `AZURE_API_KEY` | — | the key, used only when `SYSTEMONE_AUTH=key` |
+
+To use `systemone` from your own terminal too (the plugin only puts it on `PATH`
 inside Claude Code):
 
 ```bash
-make install    # builds and copies to ~/.local/bin/jev
-jev probe       # verify the API contract, prints raw + decoded response
+make install    # builds and copies to ~/.local/bin/systemone
+systemone probe       # verify the API contract, prints raw + decoded response
 ```
+
+For development, `make build` writes `bin/systemone-local`, which the launcher
+prefers over the downloaded release. `SYSTEMONE_BIN=/path/to/binary` overrides
+both, and `SYSTEMONE_RELEASE_BASE` points the download at a mirror.
 
 ## Why
 
@@ -75,16 +130,16 @@ So shrinking tool output is not where the savings are. A 3k-token file read with
 
 | | quality | tokens | wall-clock |
 |---|---|---|---|
-| [**`jev find`**](#jev-find--locate-code-by-describing-it) | P@1[^p1] **0.96** vs 0.33 for BM25, 0.08 for grep | −30% billed | ≈ 0 |
-| [**`jev ask`**](#jev-ask--a-yesno-question-across-many-files) | precision **1.00**, F1 0.97 vs 0.81 for grep | −38% billed, −70% context | ≈ 0 |
+| [**`systemone find`**](#systemone-find--locate-code-by-describing-it) | P@1[^p1] **0.96** vs 0.33 for BM25, 0.08 for grep | −30% billed | ≈ 0 |
+| [**`systemone ask`**](#systemone-ask--a-yesno-question-across-many-files) | precision **1.00**, F1 0.97 vs 0.81 for grep | −38% billed, −70% context | ≈ 0 |
 | [**Read hook**](#the-read-hook--narrows-a-big-file-to-the-part-you-asked-about) | 50 narrowed windows, **0 lost targets** | −41% billed, −78% context | +1.25 s/read |
 
 On queries whose wording never appears in the code — the case this exists for —
-grep and BM25 both collapse to **0.08** P@1 while jev holds **0.92**. Each tool
+grep and BM25 both collapse to **0.08** P@1 while systemone holds **0.92**. Each tool
 carries its full evidence [below](#what-you-get), and every
 number links to the file it came from.
 
-![paired agent runs, grep-only against jev](docs/benchmark.png)
+![paired agent runs, grep-only against systemone](docs/benchmark.png)
 
 **These tools save tokens, not time.** Wall-clock is a wash: the ~13 s a `find`
 costs roughly cancels the turns it removes. The tokens those turns would have
@@ -93,24 +148,24 @@ parked in context are gone for good; the clock barely notices. Full numbers in
 
 ## What you get
 
-### `jev find` — locate code by describing it
+### `systemone find` — locate code by describing it
 
 ```bash
-jev find "where is the register flow"
-jev find "the code that rotates uploaded photos" internal/
-jev find "rate limiting" --min 0.8 -n 5
+systemone find "where is the register flow"
+systemone find "the code that rotates uploaded photos" internal/
+systemone find "rate limiting" --min 0.8 -n 5
 ```
 
 Every file is screened from its declarations, the leading candidates are
 re-scored against their full contents, then the winners are split into chunks to
 find the line. A score marked `~` skipped verification.
 
-![jev find against grep and BM25](docs/find.png)
+![systemone find against grep and BM25](docs/find.png)
 
 **Measured** — 30 queries, 3 repositories, 2 of them never opened during
 development ([`RESULTS.md`](bench/RESULTS.md)):
 
-| | grep | BM25 | **jev** |
+| | grep | BM25 | **systemone** |
 |---|---:|---:|---:|
 | P@1, 24 answerable queries | 0.08 | 0.33 | **0.96** |
 | P@1, *vocabulary gap* (12) | 0.08 | 0.08 | **0.92** |
@@ -124,14 +179,14 @@ lexical cleverness reaches those queries. On ordinary phrasing BM25 is a real
 competitor for nothing per query.
 
 `no match in N files` is a real answer. On six queries asking for a feature the
-repository genuinely lacks, **jev returned nothing 6 times out of 6**; grep and
+repository genuinely lacks, **systemone returned nothing 6 times out of 6**; grep and
 BM25 offered 5 files every time, because a lexical method cannot report absence.
 
 What that saves is measured on agents, not rankings — 7 tasks, each run twice
 with an identical prompt except for one line
 ([`TOKENS.md`](bench/tokenecon/TOKENS.md)):
 
-| | grep arm | jev arm | |
+| | grep arm | systemone arm | |
 |---|---:|---:|---|
 | billed input tokens (mean) | 212,799 | 149,620 | **−30%** |
 | turns | 12.4 | 9.1 | −26% |
@@ -141,22 +196,22 @@ Cheaper on 6 of 7 tasks, worst case 1.02. The saving is **not** smaller tool
 results — those are 2.1k against 1.2k — it is three fewer turns, each of which
 re-sends the entire conversation.
 
-### `jev ask` — a yes/no question across many files
+### `systemone ask` — a yes/no question across many files
 
 ```bash
-jev ask "does this build a SQL query by string concatenation?" internal/ -q
-jev ask "does this handler verify the caller's identity?" api/ -q
+systemone ask "does this build a SQL query by string concatenation?" internal/ -q
+systemone ask "does this handler verify the caller's identity?" api/ -q
 ```
 
 Sweeps a directory and returns only the files that answer yes, with the line.
 
-![jev ask against a developer's regex](docs/ask.png)
+![systemone ask against a developer's regex](docs/ask.png)
 
 **Measured** — 9 questions, 217 per-file judgments, against the regex the
 labelling agent said a developer would try first
 ([`RESULTS_ASK.md`](bench/RESULTS_ASK.md)):
 
-| | grep | **jev** |
+| | grep | **systemone** |
 |---|---:|---:|
 | precision | 0.74 | **1.00** |
 | recall | 0.96 | 0.96 |
@@ -174,7 +229,7 @@ the threshold barely matters. ~$0.0016 and ~2 s per question.
 
 On agents, 3 paired audits ([`TOKENS_ASK.md`](bench/tokenecon/TOKENS_ASK.md)):
 
-| | grep arm | jev arm | |
+| | grep arm | systemone arm | |
 |---|---:|---:|---|
 | billed input tokens | 423,049 | 262,460 | **−38%** |
 | tokens entering context | 9,193 | 2,777 | **−70%** |
@@ -192,8 +247,8 @@ about a fifth of the file, centred on what answers the current request, with a
 note saying so and how to re-read.
 
 ```bash
-JEV_HOOK_DISABLE=1    # turn it off entirely
-JEV_HOOK_DEBUG=1      # print which gate decided, on stderr
+SYSTEMONE_HOOK_DISABLE=1    # turn it off entirely
+SYSTEMONE_HOOK_DEBUG=1      # print which gate decided, on stderr
 ```
 
 This is the only part that can *hide* code, so recall is the only metric that
@@ -225,13 +280,13 @@ earlier ones read:
 *Measured, not projected: four Claude Code sessions (Haiku 4.5), two per arm,
 15 prompts each, every prompt reading a Go standard-library file between 400
 lines and 80 KB — the case the hook is built for. 15/15 correct answers in every
-session, and no extra tool calls with jev (15 per session, against 17 without).
+session, and no extra tool calls with systemone (15 per session, against 17 without).
 A session that reads fewer large files will see a smaller gap.*
 
 ## Benchmarks
 
 Everything below was labelled by agents that read the code themselves and were
-**forbidden from running `jev`** — the tool does not grade its own homework.
+**forbidden from running `systemone`** — the tool does not grade its own homework.
 Labels were required to cite `file:line`, and each set includes deliberate
 near-misses.
 
@@ -258,13 +313,13 @@ are not published; the harnesses are, and take any query set in the same shape.
 
 ## Cost
 
-`jev gain` shows where it went:
+`systemone gain` shows where it went:
 
 ```
-jev — token leverage
+systemone — token leverage
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   Runs:                  105
-  Examined by jev:       3.4M tokens, out of context
+  Examined by systemone:       3.4M tokens, out of context
   Returned to the agent: 28.8K tokens, into context
 
   examined  ████████████████████████████████████████  3.4M
@@ -279,19 +334,19 @@ By command
   ask          23       488     469.2K      $0.03   $0.0015  █░░░░░░░░░░░
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  Spent on jev:                        $0.45
+  Spent on systemone:                        $0.45
   Same tokens at Opus 5 input rates:   $17.08 (38× more, read once)
 ```
 
 "Leverage" is not "saving", and the tool says so in its own output: an
-agent would not have read every byte jev did, and the comparison assumes
+agent would not have read every byte systemone did, and the comparison assumes
 those bytes entered the context once when in practice they are re-read
 every turn.
 
 | | |
 |---|---|
 | scanning a 434 KB repository | $0.0025 |
-| `jev ask` over a directory | ~$0.0016 per question |
+| `systemone ask` over a directory | ~$0.0016 per question |
 | a narrowed read | ~$0.0001 |
 
 Developing this, running the benchmark suites and about two hundred
@@ -300,8 +355,8 @@ measurements cost **$0.45** in total.
 ## Limits
 
 - **Grep is still better** for an exact symbol you can name: free, instant,
-  exact. Reach for `jev` when the *name* is the unknown.
-- **Jev never explains.** It answers *where* and *how likely*, never *why*.
+  exact. Reach for `systemone` when the *name* is the unknown.
+- **Systemone never explains.** It answers *where* and *how likely*, never *why*.
 - **Scores are calibrated probabilities, not proofs.** Open the cited line when
   it matters.
 - Sample sizes are small — tens of queries, not thousands. Where a result says
@@ -327,12 +382,12 @@ is adjustable.
 ## Layout
 
 ```
-cmd/jev/              CLI entry point
-internal/typesafe/    API client (Noul / Choice / Score)
+cmd/systemone/              CLI entry point
+internal/decision/    API client (Noul / Choice / Score)
 internal/scan/        tree walk and skeleton extraction
 internal/run/         find, ask, scan, probe, the Read hook
-internal/usage/       accounting behind `jev gain`
-skills/jev/SKILL.md   tells the agent when to reach for this
+internal/usage/       accounting behind `systemone gain`
+skills/systemone/SKILL.md   tells the agent when to reach for this
 hooks/hooks.json      PreToolUse on Read
 bench/                every benchmark, harness and result
 ```

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Paired agent runs for `jev ask`: same audit, grep-only vs ask-first."""
+"""Paired agent runs for `systemone ask`: same audit, grep-only vs ask-first."""
 import json, os, re, sys, statistics
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from agentstats import stats
 
-T = os.environ["JEV_BENCH_TASKS"]  # directory of agent transcripts (.output JSONL)
+T = os.environ["SYSTEMONE_BENCH_TASKS"]  # directory of agent transcripts (.output JSONL)
 runs = json.load(open(os.path.join(os.path.dirname(__file__), "runs_ask.json")))
 
 def answer(agent_id):
@@ -37,7 +37,7 @@ print(f"{'task':<28}{'arm':<6}{'billed':>10}{'ctx':>8}{'turns':>7}{'calls':>7}{'
 print("-" * 84)
 for t in runs["tasks"]:
     truth = set(t["truth"])
-    for arm in ("grep", "jev"):
+    for arm in ("grep", "systemone"):
         st = stats(f"{T}/{t[arm]}.output")
         p, r, f, tp, fp, fn = prf(answer(t[arm]), truth)
         rows.append(dict(task=t["task"], arm=arm, billed=st["billed_in"], ctx=st["in_context"],
@@ -50,10 +50,10 @@ def agg(arm):
     sel = [r for r in rows if r["arm"] == arm]
     return {k: statistics.mean(r[k] for r in sel) for k in ("billed", "ctx", "turns", "calls", "P", "R", "F1")}
 
-g, j = agg("grep"), agg("jev")
+g, j = agg("grep"), agg("systemone")
 print("=" * 84)
 print(f"{'arm':<8}{'billed':>12}{'ctx':>10}{'turns':>8}{'calls':>8}{'P':>7}{'R':>7}{'F1':>7}")
-for n, a in (("grep", g), ("jev", j)):
+for n, a in (("grep", g), ("systemone", j)):
     print(f"{n:<8}{a['billed']:>12,.0f}{a['ctx']:>10,.0f}{a['turns']:>8.1f}{a['calls']:>8.1f}"
           f"{a['P']:>7.2f}{a['R']:>7.2f}{a['F1']:>7.2f}")
 print()
@@ -64,7 +64,7 @@ ratios = []
 by = {}
 for r in rows: by.setdefault(r["task"], {})[r["arm"]] = r
 for t, v in by.items():
-    ratios.append(v["jev"]["billed"] / v["grep"]["billed"])
+    ratios.append(v["systemone"]["billed"] / v["grep"]["billed"])
 print(f"\n  median paired ratio {statistics.median(ratios):.2f}   "
       f"cheaper on {sum(1 for x in ratios if x < 1)}/{len(ratios)}")
 json.dump(rows, open(os.path.join(os.path.dirname(__file__), "results_ask.json"), "w"), indent=1)

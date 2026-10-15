@@ -1,12 +1,12 @@
-BIN := bin/jev
-PLUGIN_BIN := $(HOME)/.claude/plugins/cache/jev/jev/0.1.0/bin/jev
+BIN := bin/systemone-local
+PLUGIN_BIN := $(HOME)/.claude/plugins/cache/systemone/systemone/0.1.0/bin/systemone-local
 
 .PHONY: build test fmt vet install sync clean
 
 build: $(BIN)
 
 $(BIN): $(shell find . -name '*.go')
-	go build -o $(BIN) ./cmd/jev
+	go build -o $(BIN) ./cmd/systemone
 
 test:
 	go test ./...
@@ -17,10 +17,11 @@ fmt:
 vet:
 	go vet ./...
 
-# The plugin puts bin/ on PATH when it loads, so a build is the whole install.
-# This target is for using jev as a plain CLI outside Claude Code.
+# bin/systemone is a launcher that downloads the release binary. A local build
+# lands in bin/systemone-local, which the launcher prefers when present.
+# This target is for using systemone as a plain CLI outside Claude Code.
 install: build
-	install -m 0755 $(BIN) $(HOME)/.local/bin/jev
+	install -m 0755 $(BIN) $(HOME)/.local/bin/systemone
 
 # `claude plugin install` copies the binary into its own cache, so a rebuild
 # here does not reach the copy the agent runs. This pushes it across without

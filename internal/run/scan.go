@@ -6,8 +6,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/borislemeec/jev/internal/scan"
-	"github.com/borislemeec/jev/internal/usage"
+	"github.com/thesimpleassociate/systemone/internal/scan"
+	"github.com/thesimpleassociate/systemone/internal/usage"
 )
 
 // Scan is the dry run: it shows which files would be sent, what each one is
@@ -45,7 +45,7 @@ func Scan(args []string) error {
 	}
 
 	// Machine-readable corpus listing. Benchmarks and scripts need the exact
-	// file set jev would consider, without the table's truncated paths.
+	// file set systemone would consider, without the table's truncated paths.
 	if *list {
 		for _, f := range files {
 			fmt.Println(f.Path)
@@ -74,7 +74,7 @@ func Scan(args []string) error {
 	requests := (len(files) + *batch - 1) / *batch
 	fmt.Printf("\n%d files, %s of source reduced to %s of skeleton (%.0f%%).\n",
 		len(files), human(srcBytes), human(skelBytes), 100*float64(skelBytes)/float64(maxInt(srcBytes, 1)))
-	fmt.Printf("One `jev find` over this tree: %d requests, ~%d tokens, ~$%.4f.\n",
+	fmt.Printf("One `systemone find` over this tree: %d requests, ~%d tokens, ~$%.4f.\n",
 		requests, skelTok, float64(skelTok)*usage.PricePerMTok/1e6)
 	fmt.Printf("Use --show <substring> to read the skeleton a file is reduced to.\n")
 	return nil
@@ -97,13 +97,13 @@ func human(n int) string {
 	return fmt.Sprintf("%.1f MB", float64(n)/(1024*1024))
 }
 
-const scanUsage = `usage: jev scan [flags] [path...]
+const scanUsage = `usage: systemone scan [flags] [path...]
 
-Dry run. Lists the files jev find would send, what each is reduced to, and the
+Dry run. Lists the files systemone find would send, what each is reduced to, and the
 cost of the request. Makes no API call and needs no key.
 
-  jev scan
-  jev scan internal/ --show api.go
+  systemone scan
+  systemone scan internal/ --show api.go
 
 flags:
 `

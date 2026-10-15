@@ -1,10 +1,10 @@
 # Benchmark
 
-Compares `jev find` against lexical baselines on labelled retrieval queries.
+Compares `systemone find` against lexical baselines on labelled retrieval queries.
 
 ```bash
-export JEV_BIN=./bin/jev          # or leave unset to use jev on PATH
-python3 bench.py queries/*.json --k=5 --methods=grep,bm25,jev_screen,jev
+export SYSTEMONE_BIN=./bin/systemone          # or leave unset to use systemone on PATH
+python3 bench.py queries/*.json --k=5 --methods=grep,bm25,systemone_screen,systemone
 ```
 
 **The query sets are not in this repository.** They were labelled against three
@@ -18,13 +18,13 @@ git clone --depth 1 https://github.com/prometheus/prometheus /tmp/prometheus
 python3 hook/measure.py hook/cases_hugo.json hook/cases_prom.json
 ```
 
-The transcript-reading scripts under `tokenecon/` need `JEV_BENCH_TASKS` set to
+The transcript-reading scripts under `tokenecon/` need `SYSTEMONE_BENCH_TASKS` set to
 a directory of agent transcripts, which are specific to the machine that ran
 them.
 
 ## Method
 
-**Same corpus for everyone.** Every method ranks the file list `jev scan --list`
+**Same corpus for everyone.** Every method ranks the file list `systemone scan --list`
 returns, so a difference in results is a difference in ranking and not in what
 each tool decided to look at.
 
@@ -34,8 +34,8 @@ each tool decided to look at.
 |---|---|
 | `grep` | what an agent reaches for first: case-insensitive alternation over the query's content words, files ranked by number of matching lines |
 | `bm25` | a standard lexical IR ranker (k1=1.5, b=0.75). Identifiers are split on camelCase and underscores, so `apiSignup` matches "signup" — this is a deliberately strong baseline, stronger than plain grep |
-| `jev_screen` | ablation: jev's skeleton screen only, with the verify pass disabled |
-| `jev` | the shipping two-stage configuration |
+| `systemone_screen` | ablation: systemone's skeleton screen only, with the verify pass disabled |
+| `systemone` | the shipping two-stage configuration |
 
 **Metrics.** P@1, recall@5 and MRR against the labelled files. Negative-control
 queries are scored separately: they ask for a feature that does not exist, and
@@ -44,7 +44,7 @@ what is reported is how many files each method still offers.
 ## Ground truth
 
 The labels were written by separate agents that explored each repository with
-grep and by reading files, and were **forbidden from running `jev`** — the tool
+grep and by reading files, and were **forbidden from running `systemone`** — the tool
 under test must not grade itself. Each labelled file carries a `file:line`
 justification. A file counts as relevant only if it implements or defines the
 thing; files that merely import, call, style or test it do not.
@@ -61,10 +61,10 @@ Every query set has three kinds of query:
 
 ## Honesty notes
 
-- The five queries used while tuning jev (register flow, photo rotation,
+- The five queries used while tuning systemone (register flow, photo rotation,
   websocket chat, 4-digit codes, dark mode) are **excluded** from every query
   set. Nothing here was fitted to.
-- `repo A (Go + Flutter, French UI)` is the repository jev was developed against; `repo C (Go + Flutter)` and `repo B (Go + React PWA)`
+- `repo A (Go + Flutter, French UI)` is the repository systemone was developed against; `repo C (Go + Flutter)` and `repo B (Go + React PWA)`
   were never opened during development. Read the per-repo numbers before the
   pooled ones.
 - Ground truth is one labeller's judgment per repo, not a consensus. "Relevant"

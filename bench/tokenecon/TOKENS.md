@@ -1,6 +1,6 @@
 # Token economy
 
-The retrieval benchmark measures whether jev finds the right file. This one
+The retrieval benchmark measures whether systemone finds the right file. This one
 measures the thing the tool actually exists for: does using it cost an agent
 fewer tokens?
 
@@ -9,9 +9,9 @@ fewer tokens?
 Seven tasks, each run twice by a fresh agent with an identical prompt except for
 one line:
 
-- **grep arm** — "use grep/rg, find, ls and reading files. The `jev` command must
+- **grep arm** — "use grep/rg, find, ls and reading files. The `systemone` command must
   NOT be used."
-- **jev arm** — "use `jev find` first; you may also grep and read files to confirm."
+- **systemone arm** — "use `systemone find` first; you may also grep and read files to confirm."
 
 Both arms got the same stopping rule ("work until confident, then stop") and the
 same output format, so neither was pushed to work longer than the other. Neither
@@ -30,7 +30,7 @@ Both arms answered **every task correctly** — recall 1.00 on all four tasks wi
 a real answer, and both correctly said "none" on all three absent features. The
 comparison is therefore at equal quality.
 
-| task | kind | grep | jev | ratio |
+| task | kind | grep | systemone | ratio |
 |---|---|---:|---:|---:|
 | repo C (Go + Flutter) / member signs up for a game | vocab gap | 196,143 | 93,059 | 0.47 |
 | repo C (Go + Flutter) / password reset | absent | 328,699 | 156,679 | 0.48 |
@@ -40,7 +40,7 @@ comparison is therefore at equal quality.
 | repo B (Go + React PWA) / billing | absent | 183,898 | 170,321 | 0.93 |
 | repo A (Go + Flutter, French UI) / push notification | absent | 264,188 | 268,537 | 1.02 |
 
-| | grep | jev | |
+| | grep | systemone | |
 |---|---:|---:|---|
 | billed tokens (mean) | 212,799 | 149,620 | **−30%** |
 | tokens into context | 2,087 | 1,198 | −43% |
@@ -48,7 +48,7 @@ comparison is therefore at equal quality.
 | tool calls | 7.0 | 5.1 | −27% |
 | recall | 1.00 | 1.00 | — |
 
-Median paired ratio **0.66**; cheaper on 6 of 7 tasks; worst case 1.02, so jev
+Median paired ratio **0.66**; cheaper on 6 of 7 tasks; worst case 1.02, so systemone
 never meaningfully lost.
 
 By kind: vocabulary gap −36%, ordinary −38%, absent feature −23%.
@@ -65,8 +65,8 @@ more than a quarter of the bill.
 A lexical search has no way to conclude that something is not there. It can only
 keep trying more synonyms, and it does: on `repo C (Go + Flutter) / password reset` the grep
 agent spent **20 turns and 328,699 tokens** establishing that a password-reset
-flow does not exist, against 10 turns and 156,679 for the jev agent, which asked
-once and got "no match". Two of the three absent-feature tasks favoured jev and
+flow does not exist, against 10 turns and 156,679 for the systemone agent, which asked
+once and got "no match". Two of the three absent-feature tasks favoured systemone and
 the third was level.
 
 ## Limits

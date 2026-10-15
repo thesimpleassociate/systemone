@@ -9,8 +9,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/borislemeec/jev/internal/typesafe"
-	"github.com/borislemeec/jev/internal/usage"
+	"github.com/thesimpleassociate/systemone/internal/decision"
+	"github.com/thesimpleassociate/systemone/internal/usage"
 )
 
 // Lint checks a just-made edit against the project's own written conventions.
@@ -19,11 +19,11 @@ import (
 // adds a line of context, never removes anything. A wrong answer here costs the
 // agent a moment's attention; a wrong answer in the Read hook hides code. That
 // asymmetry is why it can afford to run on every edit. It is nonetheless off
-// until JEV_LINT_ENABLE is set: the rules are a project's own, the useful ones
+// until SYSTEMONE_LINT_ENABLE is set: the rules are a project's own, the useful ones
 // are not obvious to write, and a checker nobody has tuned is just noise on
 // every edit. Opt in once you have rules worth enforcing.
 //
-// Rules live in .jev-rules.json at the repository root, so a project states its
+// Rules live in .systemone-rules.json at the repository root, so a project states its
 // own conventions rather than inheriting someone else's idea of good style:
 //
 //	[{"id": "raw-material",
@@ -43,7 +43,7 @@ type lintRule struct {
 	Threshold    float64           `json:"threshold,omitempty"`
 }
 
-const lintRulesFile = ".jev-rules.json"
+const lintRulesFile = ".systemone-rules.json"
 
 // defaultLintThreshold is measured on 27 labelled changes, 11 of them written
 // to be near-misses: real violations scored 0.64-0.96 and clean changes
@@ -105,13 +105,13 @@ func loadRules(start string) ([]lintRule, string) {
 
 func Lint(args []string) error {
 	if len(args) == 0 || args[0] != "edit" {
-		return fmt.Errorf("usage: jev lint edit   (reads a PostToolUse payload on stdin)")
+		return fmt.Errorf("usage: systemone lint edit   (reads a PostToolUse payload on stdin)")
 	}
 	// Off by default. Unlike find, ask and the Read hook, this one earns its
 	// keep only against rules the project actually wrote.
-	if strings.TrimSpace(os.Getenv("JEV_LINT_ENABLE")) == "" ||
-		strings.TrimSpace(os.Getenv("JEV_LINT_DISABLE")) != "" {
-		lintDebug("disabled (set JEV_LINT_ENABLE=1 to turn it on)")
+	if strings.TrimSpace(os.Getenv("SYSTEMONE_LINT_ENABLE")) == "" ||
+		strings.TrimSpace(os.Getenv("SYSTEMONE_LINT_DISABLE")) != "" {
+		lintDebug("disabled (set SYSTEMONE_LINT_ENABLE=1 to turn it on)")
 		return emitLint("")
 	}
 
@@ -160,15 +160,15 @@ func Lint(args []string) error {
 		return emitLint("")
 	}
 
-	client, err := typesafe.New()
+	client, err := decision.New()
 	if err != nil {
 		lintDebug("no API key")
 		return emitLint("")
 	}
 
-	questions := make(map[string]typesafe.Question, len(apply))
+	questions := make(map[string]decision.Question, len(apply))
 	for _, r := range apply {
-		questions[r.ID] = typesafe.Question{
+		questions[r.ID] = decision.Question{
 			Type: "noul", Instructions: r.Instructions, Criteria: r.Criteria,
 		}
 	}
@@ -184,7 +184,7 @@ func Lint(args []string) error {
 	for _, r := range apply {
 		lintDebug("  %-28s %.2f", r.ID, resp.Answers[r.ID].Noul)
 	}
-	// Account for the spend: `jev gain` should show what the linter costs, not
+	// Account for the spend: `systemone gain` should show what the linter costs, not
 	// silently leave it out of the total.
 	usage.Log(usage.Record{
 		Command: "lint", Requests: 1, Files: 1,
@@ -211,7 +211,7 @@ func Lint(args []string) error {
 	sort.Slice(hits, func(i, j int) bool { return hits[i].score > hits[j].score })
 
 	var b strings.Builder
-	fmt.Fprintf(&b, "jev lint on %s — this change may break a project convention:\n", filepath.Base(path))
+	fmt.Fprintf(&b, "systemone lint on %s — this change may break a project convention:\n", filepath.Base(path))
 	for _, h := range hits {
 		fmt.Fprintf(&b, "  %.2f  %s\n", h.score, h.id)
 	}
@@ -220,12 +220,12 @@ func Lint(args []string) error {
 	return emitLint(b.String())
 }
 
-// lintDebug reports to stderr under JEV_LINT_DEBUG. A linter that stays quiet
+// lintDebug reports to stderr under SYSTEMONE_LINT_DEBUG. A linter that stays quiet
 // is indistinguishable from one that is broken, and the quiet case is the
 // common one — so the scores have to be inspectable.
 func lintDebug(format string, args ...any) {
-	if os.Getenv("JEV_LINT_DEBUG") != "" {
-		fmt.Fprintf(os.Stderr, "jev lint: "+format+"\n", args...)
+	if os.Getenv("SYSTEMONE_LINT_DEBUG") != "" {
+		fmt.Fprintf(os.Stderr, "systemone lint: "+format+"\n", args...)
 	}
 }
 

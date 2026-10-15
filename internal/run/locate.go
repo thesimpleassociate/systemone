@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/borislemeec/jev/internal/typesafe"
+	"github.com/thesimpleassociate/systemone/internal/decision"
 )
 
 // maxChunks keeps a file inside one Choice question, which accepts at most 255
@@ -29,7 +29,7 @@ type located struct {
 // locateLine asks which run of lines in one file most directly implements the
 // goal. It returns Line 0 when no chunk stands out, which is a real answer: the
 // file is relevant without having a single place that is the answer.
-func locateLine(ctx context.Context, c *typesafe.Client, goal, path string, data []byte) (located, error) {
+func locateLine(ctx context.Context, c *decision.Client, goal, path string, data []byte) (located, error) {
 	// A file too large for one request is cut into sections and each is located
 	// independently; the section whose chunk distribution is most peaked wins.
 	// That works because confidence is exactly the signal the hook already
@@ -43,7 +43,7 @@ func locateLine(ctx context.Context, c *typesafe.Client, goal, path string, data
 
 // locateAcrossSections splits an oversized file on line boundaries and keeps the
 // best-scoring section's answer, with line numbers mapped back to the whole file.
-func locateAcrossSections(ctx context.Context, c *typesafe.Client, goal, path string, data []byte) (located, error) {
+func locateAcrossSections(ctx context.Context, c *decision.Client, goal, path string, data []byte) (located, error) {
 	lines := strings.Split(string(data), "\n")
 	sections := (len(data) + maxSectionBytes - 1) / maxSectionBytes
 	per := (len(lines) + sections - 1) / sections
@@ -76,7 +76,7 @@ func locateAcrossSections(ctx context.Context, c *typesafe.Client, goal, path st
 
 // locateWithin does the real work over one span. lineOffset is how many lines of
 // the original file precede this span, so reported lines are absolute.
-func locateWithin(ctx context.Context, c *typesafe.Client, goal, path string, data []byte, lineOffset int) (located, error) {
+func locateWithin(ctx context.Context, c *decision.Client, goal, path string, data []byte, lineOffset int) (located, error) {
 	lines := strings.Split(string(data), "\n")
 
 	size := 10
@@ -108,9 +108,9 @@ func locateWithin(ctx context.Context, c *typesafe.Client, goal, path string, da
 	resp, err := c.Ask(ctx, map[string]any{
 		"goal": goal,
 		"file": map[string]any{"path": path, "chunks": chunks},
-	}, map[string]typesafe.Question{
-		"where":  typesafe.Choice(locateInstructions, criteria),
-		"exists": typesafe.Noul(locateExists),
+	}, map[string]decision.Question{
+		"where":  decision.Choice(locateInstructions, criteria),
+		"exists": decision.Noul(locateExists),
 	})
 	if err != nil {
 		return located{}, err

@@ -1,8 +1,8 @@
-// Package usage records what each jev run cost and what it kept out of the
+// Package usage records what each systemone run cost and what it kept out of the
 // agent's context.
 //
 // The second number is the point of the tool, so it is worth being careful
-// about what it claims. "Avoided" counts the tokens of file content that jev
+// about what it claims. "Avoided" counts the tokens of file content that systemone
 // read on the agent's behalf. It is an upper bound on what an agent would
 // otherwise have pulled into its context, not a measured saving: an agent
 // looking for one function might have read three files, or thirty.
@@ -27,18 +27,18 @@ type Record struct {
 	InTokens  int       `json:"in_tokens"`
 	Files     int       `json:"files"`
 	ScanBytes int       `json:"scan_bytes"`
-	OutTokens int       `json:"ret_tokens"` // what jev printed back into context
+	OutTokens int       `json:"ret_tokens"` // what systemone printed back into context
 }
 
 func dir() string {
-	if d := strings.TrimSpace(os.Getenv("JEV_DATA")); d != "" {
+	if d := strings.TrimSpace(os.Getenv("SYSTEMONE_DATA")); d != "" {
 		return d
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return ".jev"
+		return ".systemone"
 	}
-	return filepath.Join(home, ".jev")
+	return filepath.Join(home, ".systemone")
 }
 
 func path() string { return filepath.Join(dir(), "usage.jsonl") }
@@ -46,7 +46,7 @@ func path() string { return filepath.Join(dir(), "usage.jsonl") }
 // Log appends one record. Failure is silent: accounting must never break a
 // search that otherwise worked.
 func Log(r Record) {
-	if os.Getenv("JEV_NO_STATS") != "" {
+	if os.Getenv("SYSTEMONE_NO_STATS") != "" {
 		return
 	}
 	r.When = time.Now()

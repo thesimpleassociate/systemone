@@ -15,7 +15,7 @@ counts, and compression is worthless without it.
 Two rounds. 12 targets in three 1210-1482 line files (repo A (Go + Flutter, French UI), repo B (Go + React PWA), repo C (Go + Flutter)),
 then 40 targets in eight 1439-5020 line files (Hugo, Prometheus). Every target is
 a `(goal, line)` pair written by an agent that read the file and was forbidden
-from running `jev`, with one target in each fifth of each file — a tool that
+from running `systemone`, with one target in each fifth of each file — a tool that
 always guessed "near the top" had to show up as wrong.
 
 ### Recall
@@ -62,7 +62,7 @@ Verified stable: two readings 90 s apart hashed identically.
 **The model's context limit is about 32k input tokens.** Measured: a 113 KB
 payload reported 31,014 input tokens and passed; 134 KB was refused with
 `max_tokens_exceeded`. This is not in the documentation, so it is measured here
-and every payload cap in the tool derives from it — `jev ask` sends at most
+and every payload cap in the tool derives from it — `systemone ask` sends at most
 90,000 characters for this reason.
 
 **Sectioning does not work for narrowing.** A file too large for one request is
@@ -89,7 +89,7 @@ not the protection.
 
 ## Where it fires
 
-Only on a file between `JEV_HOOK_MIN_LINES` (400) and 80 KB. Both bounds are
+Only on a file between `SYSTEMONE_HOOK_MIN_LINES` (400) and 80 KB. Both bounds are
 measured rather than chosen:
 
 - The **400-line floor** is where the economics start to pay: a 500-line file
@@ -113,14 +113,14 @@ How much of a repository the floor reaches, on the three local ones:
 
 ## Shipping posture
 
-**On by default.** `JEV_HOOK_DISABLE=1` turns every narrowing off without
+**On by default.** `SYSTEMONE_HOOK_DISABLE=1` turns every narrowing off without
 uninstalling anything — one variable to reach for if a read ever looks like it
 lost something.
 
 Every gate fails toward doing nothing: disabled, not a `Read`, an explicit
 offset or limit already given, file under 400 lines, file over 80 KB, no goal in
 the transcript, no API key, confidence under 0.60, any error or timeout — all
-pass the read through untouched. `JEV_HOOK_DEBUG=1` names the gate that fired,
+pass the read through untouched. `SYSTEMONE_HOOK_DEBUG=1` names the gate that fired,
 because a hook that silently does nothing cannot be told apart from one that is
 broken.
 

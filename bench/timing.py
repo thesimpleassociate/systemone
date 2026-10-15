@@ -9,7 +9,7 @@ was — the ratio between two arms of the same pair is the trustworthy part.
 import json, os, statistics, sys
 from datetime import datetime
 
-T = os.environ["JEV_BENCH_TASKS"]  # directory of agent transcripts (.output JSONL)
+T = os.environ["SYSTEMONE_BENCH_TASKS"]  # directory of agent transcripts (.output JSONL)
 
 
 def seconds(agent_id):
@@ -32,8 +32,8 @@ def seconds(agent_id):
 
 
 SETS = [
-    ("find   (grep-only vs jev-first)", "tokenecon/runs.json", "grep", "jev"),
-    ("ask    (grep-only vs ask-first)", "tokenecon/runs_ask.json", "grep", "jev"),
+    ("find   (grep-only vs systemone-first)", "tokenecon/runs.json", "grep", "systemone"),
+    ("ask    (grep-only vs ask-first)", "tokenecon/runs_ask.json", "grep", "systemone"),
     ("Read   (whole file vs window)", "tokenecon/runs_hook.json", "full", "windowed"),
 ]
 

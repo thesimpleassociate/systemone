@@ -10,9 +10,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/borislemeec/jev/internal/scan"
-	"github.com/borislemeec/jev/internal/typesafe"
-	"github.com/borislemeec/jev/internal/usage"
+	"github.com/thesimpleassociate/systemone/internal/scan"
+	"github.com/thesimpleassociate/systemone/internal/decision"
+	"github.com/thesimpleassociate/systemone/internal/usage"
 )
 
 // Two judgments, deliberately identical in wording except for what they are
@@ -84,7 +84,7 @@ func Find(args []string) error {
 		paths = []string{"."}
 	}
 
-	client, err := typesafe.New()
+	client, err := decision.New()
 	if err != nil {
 		return err
 	}
@@ -143,7 +143,7 @@ func Find(args []string) error {
 }
 
 // screen scores every file from its skeleton, one file per request.
-func screen(ctx context.Context, c *typesafe.Client, goal string, files []scan.File, parallel int, stats *usage.Record) ([]hit, error) {
+func screen(ctx context.Context, c *decision.Client, goal string, files []scan.File, parallel int, stats *usage.Record) ([]hit, error) {
 	var (
 		mu   sync.Mutex
 		hits []hit
@@ -161,7 +161,7 @@ func screen(ctx context.Context, c *typesafe.Client, goal string, files []scan.F
 			resp, err := c.Ask(ctx, map[string]any{
 				"goal": goal,
 				"file": map[string]any{"path": f.Path, "skeleton": f.Skeleton},
-			}, map[string]typesafe.Question{
+			}, map[string]decision.Question{
 				"match": {Type: "noul", Instructions: screenInstructions, Criteria: screenCriteria},
 			})
 
@@ -190,7 +190,7 @@ func screen(ctx context.Context, c *typesafe.Client, goal string, files []scan.F
 // verifyTop re-scores the leading candidates against their full contents, which
 // separates them far better than skeletons do: a skeleton drops the body, and
 // the body is often what makes a file the answer rather than a neighbour of it.
-func verifyTop(ctx context.Context, c *typesafe.Client, goal string, hits []hit, parallel int, stats *usage.Record) {
+func verifyTop(ctx context.Context, c *decision.Client, goal string, hits []hit, parallel int, stats *usage.Record) {
 	var (
 		mu  sync.Mutex
 		wg  sync.WaitGroup
@@ -214,7 +214,7 @@ func verifyTop(ctx context.Context, c *typesafe.Client, goal string, hits []hit,
 			resp, err := c.Ask(ctx, map[string]any{
 				"goal": goal,
 				"file": map[string]any{"path": h.Path, "content": content},
-			}, map[string]typesafe.Question{
+			}, map[string]decision.Question{
 				"match": {Type: "noul", Instructions: verifyInstructions, Criteria: screenCriteria},
 			})
 			if err != nil {
@@ -235,7 +235,7 @@ func verifyTop(ctx context.Context, c *typesafe.Client, goal string, hits []hit,
 
 // locateLines turns "this file" into "this line", which is what actually saves
 // the agent a Read.
-func locateLines(ctx context.Context, c *typesafe.Client, goal string, hits []hit, stats *usage.Record) {
+func locateLines(ctx context.Context, c *decision.Client, goal string, hits []hit, stats *usage.Record) {
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	for i := range hits {
@@ -294,7 +294,7 @@ func render(goal string, scanned int, all, kept []hit, asJSON bool) string {
 }
 
 // permute moves flags ahead of positional arguments so that both
-// `jev find -n 3 "query"` and `jev find "query" -n 3` work. Go's flag package
+// `systemone find -n 3 "query"` and `systemone find "query" -n 3` work. Go's flag package
 // stops at the first non-flag, which silently turned trailing flags into paths.
 func permute(args []string) []string {
 	var flags, rest []string
@@ -329,19 +329,19 @@ func min2(a, b int) int {
 	return b
 }
 
-const findUsage = `usage: jev find [flags] "<what you are looking for>" [path...]
+const findUsage = `usage: systemone find [flags] "<what you are looking for>" [path...]
 
 Ranks every source file under path against a plain-language description and
 prints the ones that match, with a line number where it can find one. Files are
-read by jev, not by the agent, so only the result enters the context.
+read by systemone, not by the agent, so only the result enters the context.
 
 Two passes: every file is screened from its declarations, then the leading
 candidates are re-scored against their full contents. A score marked "~" comes
 from the screen alone and is less reliable.
 
-  jev find "where is the register flow"
-  jev find "the code that rotates uploaded photos" internal/
-  jev find "rate limiting" --min 0.7 -n 5
+  systemone find "where is the register flow"
+  systemone find "the code that rotates uploaded photos" internal/
+  systemone find "rate limiting" --min 0.7 -n 5
 
 flags:
 `

@@ -11,7 +11,7 @@ import json, os, re, statistics, subprocess, sys, tempfile
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 
-JEV = os.environ.get("JEV_BIN", "jev")
+SYSTEMONE = os.environ.get("SYSTEMONE_BIN", "systemone")
 
 
 def run(c):
@@ -22,11 +22,11 @@ def run(c):
     payload = {"tool_name": "Read",
                "tool_input": {"file_path": os.path.join(c["repo"], c["file"])},
                "cwd": c["repo"], "transcript_path": tp}
-    # No JEV_HOOK_MIN_LINES: measure the floor the binary actually ships with.
-    env = dict(os.environ, JEV_HOOK_ENABLE="1", JEV_HOOK_DEBUG="1")
+    # No SYSTEMONE_HOOK_MIN_LINES: measure the floor the binary actually ships with.
+    env = dict(os.environ, SYSTEMONE_HOOK_ENABLE="1", SYSTEMONE_HOOK_DEBUG="1")
     if "min_lines" in c:
-        env["JEV_HOOK_MIN_LINES"] = str(c["min_lines"])
-    r = subprocess.run([JEV, "hook", "read"], input=json.dumps(payload),
+        env["SYSTEMONE_HOOK_MIN_LINES"] = str(c["min_lines"])
+    r = subprocess.run([SYSTEMONE, "hook", "read"], input=json.dumps(payload),
                        capture_output=True, text=True, env=env)
     os.unlink(tp)
     try:

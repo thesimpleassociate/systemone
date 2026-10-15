@@ -1,9 +1,9 @@
-// Package typesafe is a minimal client for the TypeSafe System One API.
+// Package decision is a minimal client for the Microsoft Decision (System One) API.
 //
 // The API is a single endpoint: you POST some state plus a map of typed
 // questions, and get back one answer per question. The model returns no prose,
 // only numbers, so everything downstream is thresholds and sorting.
-package typesafe
+package decision
 
 import (
 	"bytes"
@@ -20,26 +20,45 @@ import (
 )
 
 const (
-	endpoint     = "https://api.typesafe.ai/v1/systemone"
-	DefaultModel = "jev-latest"
+	// providerPath is appended to a Foundry resource base URL (AZURE_ENDPOINT).
+	providerPath = "/providers/microsoft/v1/systemone"
+
+	// DefaultModel is the Foundry *deployment name*, not the underlying model
+	// name. Override with SYSTEMONE_MODEL when the deployment is named differently.
+	DefaultModel = "Decision-1"
 )
 
-// Key reads the API key. TYPE_SAFE_AI_KEY is the name used in this project's
-// setup; the others are what the official SDKs look for, accepted so a machine
-// that already has one configured works without extra setup.
+// Endpoint resolves the URL to POST to. There is no default: the Foundry
+// resource is yours, so SYSTEMONE_ENDPOINT (the full decision API URL) or
+// AZURE_ENDPOINT (the resource base URL; the provider path is appended) must be set.
+func Endpoint() (string, error) {
+	if v := strings.TrimSpace(os.Getenv("SYSTEMONE_ENDPOINT")); v != "" {
+		return v, nil
+	}
+	if v := strings.TrimSpace(os.Getenv("AZURE_ENDPOINT")); v != "" {
+		return strings.TrimRight(v, "/") + providerPath, nil
+	}
+	return "", fmt.Errorf("no endpoint: set SYSTEMONE_ENDPOINT to your Foundry decision API URL " +
+		"(https://<resource>.services.ai.azure.com" + providerPath + ") or AZURE_ENDPOINT to the resource base URL")
+}
+
+// Key reads the API key, used only when SYSTEMONE_AUTH=key. AZURE_API_KEY /
+// SYSTEMONE_API_KEY are checked first; the TypeSafe names are still accepted.
 func Key() (string, error) {
-	for _, name := range []string{"TYPE_SAFE_AI_KEY", "TYPESAFE_API_KEY", "TYPESAFE_AI_API_KEY"} {
+	for _, name := range []string{"SYSTEMONE_API_KEY", "AZURE_API_KEY", "TYPE_SAFE_AI_KEY", "TYPESAFE_API_KEY", "TYPESAFE_AI_API_KEY"} {
 		if v := strings.TrimSpace(os.Getenv(name)); v != "" {
 			return v, nil
 		}
 	}
-	return "", fmt.Errorf("no API key: set TYPE_SAFE_AI_KEY in your environment")
+	return "", fmt.Errorf("no API key: set AZURE_API_KEY in your environment")
 }
 
 type Client struct {
-	key   string
-	model string
-	http  *http.Client
+	key      string
+	model    string
+	endpoint string
+	tokens   *tokenSource // nil when authenticating with an API key
+	http     *http.Client
 
 	// The service allows 1200 requests per minute. One request per file means a
 	// large tree can reach that, so requests are spaced rather than left to
@@ -55,17 +74,29 @@ type Client struct {
 }
 
 func New() (*Client, error) {
-	k, err := Key()
+	// Entra ID (via the Azure CLI) is the default; SYSTEMONE_AUTH=key uses an API key.
+	endpoint, err := Endpoint()
 	if err != nil {
 		return nil, err
 	}
+	var k string
+	var tokens *tokenSource
+	if strings.EqualFold(os.Getenv("SYSTEMONE_AUTH"), "key") {
+		if k, err = Key(); err != nil {
+			return nil, err
+		}
+	} else {
+		tokens = &tokenSource{}
+	}
 	model := DefaultModel
-	if m := strings.TrimSpace(os.Getenv("JEV_MODEL")); m != "" {
+	if m := strings.TrimSpace(os.Getenv("SYSTEMONE_MODEL")); m != "" {
 		model = m
 	}
 	return &Client{
 		key:         k,
 		model:       model,
+		endpoint:    endpoint,
+		tokens:      tokens,
 		http:        &http.Client{Timeout: 120 * time.Second},
 		minInterval: time.Minute / 1000,
 	}, nil
@@ -148,15 +179,11 @@ type apiError struct {
 func (e *apiError) Error() string {
 	switch e.status {
 	case http.StatusUnauthorized:
-		return "401 unauthorized: the API key was rejected (check TYPE_SAFE_AI_KEY)"
+		return "401 unauthorized: credentials rejected (run `az login` and check you have access to the Foundry resource, or check AZURE_API_KEY with SYSTEMONE_AUTH=key)"
+	case http.StatusNotFound:
+		return fmt.Sprintf("404 not found: check the endpoint and that SYSTEMONE_MODEL is your Foundry deployment name: %s", e.body)
 	case http.StatusUnprocessableEntity:
 		return fmt.Sprintf("422 the request was malformed: %s", e.body)
-	case http.StatusServiceUnavailable:
-		if strings.Contains(e.body, "model_unavailable") {
-			return "503 model_unavailable: TypeSafe reports the model is down. " +
-				"This is on their side — the key and the request are fine. Retry later, " +
-				"or check status with: curl -H \"Authorization: Bearer $TYPE_SAFE_AI_KEY\" https://api.typesafe.ai/v1/models"
-		}
 	}
 	return fmt.Sprintf("HTTP %d: %s", e.status, e.body)
 }
@@ -189,6 +216,7 @@ func (c *Client) Ask(ctx context.Context, state any, questions map[string]Questi
 
 	const maxAttempts = 5
 	var lastErr error
+	refreshed := false
 	for attempt := range maxAttempts {
 		if attempt > 0 {
 			backoff := time.Duration(1<<attempt) * 250 * time.Millisecond
@@ -206,7 +234,16 @@ func (c *Client) Ask(ctx context.Context, state any, questions map[string]Questi
 		}
 		lastErr = err
 		var ae *apiError
-		if !errorsAs(err, &ae) || !ae.retryable() {
+		if !errorsAs(err, &ae) {
+			return nil, err
+		}
+		// A cached Entra token can be revoked or stale; fetch a fresh one once.
+		if ae.status == http.StatusUnauthorized && c.tokens != nil && !refreshed {
+			c.tokens.Invalidate()
+			refreshed = true
+			continue
+		}
+		if !ae.retryable() {
 			return nil, err
 		}
 	}
@@ -240,16 +277,25 @@ func (c *Client) do(ctx context.Context, body []byte) (*Response, error) {
 	if err := c.reserve(ctx); err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.endpoint, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Authorization", "Bearer "+c.key)
+	if c.tokens != nil {
+		tok, err := c.tokens.Token(ctx)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Authorization", "Bearer "+tok)
+	} else {
+		req.Header.Set("api-key", c.key)
+	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
 
 	httpResp, err := c.http.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("calling TypeSafe: %w", err)
+		return nil, fmt.Errorf("calling decision endpoint: %w", err)
 	}
 	defer httpResp.Body.Close()
 
@@ -258,7 +304,7 @@ func (c *Client) do(ctx context.Context, body []byte) (*Response, error) {
 		return nil, fmt.Errorf("reading response: %w", err)
 	}
 	if c.Debug != nil {
-		fmt.Fprintf(c.Debug, "--- POST %s -> %d ---\n%s\n", endpoint, httpResp.StatusCode, raw)
+		fmt.Fprintf(c.Debug, "--- POST %s -> %d ---\n%s\n", c.endpoint,httpResp.StatusCode, raw)
 	}
 	if httpResp.StatusCode != http.StatusOK {
 		return nil, &apiError{status: httpResp.StatusCode, body: truncate(string(raw), 400)}

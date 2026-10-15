@@ -10,9 +10,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/borislemeec/jev/internal/scan"
-	"github.com/borislemeec/jev/internal/typesafe"
-	"github.com/borislemeec/jev/internal/usage"
+	"github.com/thesimpleassociate/systemone/internal/scan"
+	"github.com/thesimpleassociate/systemone/internal/decision"
+	"github.com/thesimpleassociate/systemone/internal/usage"
 )
 
 // askInstructions keeps the judgment on the file rather than on the world. A
@@ -59,7 +59,7 @@ func Ask(args []string) error {
 	}
 	question, targets := rest[0], rest[1:]
 
-	client, err := typesafe.New()
+	client, err := decision.New()
 	if err != nil {
 		return err
 	}
@@ -146,7 +146,7 @@ func Ask(args []string) error {
 // 200_000, which silently turned every large file into a 400.
 const maxContent = 90_000
 
-func askFile(ctx context.Context, c *typesafe.Client, question, path, content string) (float64, int, error) {
+func askFile(ctx context.Context, c *decision.Client, question, path, content string) (float64, int, error) {
 	parts := []string{content}
 	if len(content) > maxContent {
 		parts = nil
@@ -160,8 +160,8 @@ func askFile(ctx context.Context, c *typesafe.Client, question, path, content st
 		resp, err := c.Ask(ctx, map[string]any{
 			"question": question,
 			"file":     map[string]any{"path": path, "content": part},
-		}, map[string]typesafe.Question{
-			"answer": typesafe.Noul(askInstructions),
+		}, map[string]decision.Question{
+			"answer": decision.Noul(askInstructions),
 		})
 		if err != nil {
 			return 0, tokens, err
@@ -175,7 +175,7 @@ func askFile(ctx context.Context, c *typesafe.Client, question, path, content st
 }
 
 // expand turns file and directory arguments into a file list. A directory is
-// walked with the same filters as find, so `jev ask "..." internal/` behaves.
+// walked with the same filters as find, so `systemone ask "..." internal/` behaves.
 func expand(targets []string) ([]scan.File, error) {
 	var direct []scan.File
 	var dirs []string
@@ -257,15 +257,15 @@ func maxInt(a, b int) int {
 	return b
 }
 
-const askUsage = `usage: jev ask [flags] "<yes/no question>" <file|dir...>
+const askUsage = `usage: systemone ask [flags] "<yes/no question>" <file|dir...>
 
 Puts one question to each file and reports the probability that the answer is
-yes, with the relevant line for the files that say yes. jev reads the files;
+yes, with the relevant line for the files that say yes. systemone reads the files;
 the agent reads only these lines.
 
-  jev ask "does this validate the email before saving?" internal/app/api.go
-  jev ask "does this call the network on the main thread?" mobile/lib/
-  jev ask "is there a SQL query built by string concatenation?" internal/ -q
+  systemone ask "does this validate the email before saving?" internal/app/api.go
+  systemone ask "does this call the network on the main thread?" mobile/lib/
+  systemone ask "is there a SQL query built by string concatenation?" internal/ -q
 
 flags:
 `

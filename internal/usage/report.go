@@ -10,7 +10,7 @@ import (
 
 // claudeInputUSDPerMTok is Claude Opus 5's input price, used only for the
 // comparison line. It is a reference point, not a claim: an agent would not
-// have read every byte jev did.
+// have read every byte systemone did.
 const claudeInputUSDPerMTok = 5.0
 
 const (
@@ -23,7 +23,7 @@ const (
 )
 
 // styler turns styling off when the output is not a terminal, or when NO_COLOR
-// is set, so piping `jev gain` into a file gives plain text.
+// is set, so piping `systemone gain` into a file gives plain text.
 type styler struct{ on bool }
 
 func newStyler(w io.Writer) styler {
@@ -79,7 +79,7 @@ func money(v float64) string {
 	return fmt.Sprintf("$%.2f", v)
 }
 
-// Render writes the summary. The headline is leverage — tokens jev examined
+// Render writes the summary. The headline is leverage — tokens systemone examined
 // against tokens it put into the conversation — because that is the quantity
 // actually measured. It is deliberately not called a saving: see the closing
 // note, which is part of the output and not a footnote to be dropped.
@@ -111,10 +111,10 @@ func Render(w io.Writer, recs []Record, history bool) {
 	spent := float64(tot.InTokens) * PricePerMTok / 1e6
 	elsewhere := float64(examined) * claudeInputUSDPerMTok / 1e6
 
-	fmt.Fprintf(w, "\n%s\n%s\n", s.c(bold, "jev — token leverage"), s.c(dim, line))
+	fmt.Fprintf(w, "\n%s\n%s\n", s.c(bold, "systemone — token leverage"), s.c(dim, line))
 	fmt.Fprintf(w, "  %-22s %s\n", "Runs:", s.c(bold, fmt.Sprintf("%d", len(recs))))
 	fmt.Fprintf(w, "  %-22s %s\n", "Requests:", short(tot.Requests))
-	fmt.Fprintf(w, "  %-22s %s %s\n", "Examined by jev:",
+	fmt.Fprintf(w, "  %-22s %s %s\n", "Examined by systemone:",
 		s.c(cyan, short(examined)), s.c(dim, "tokens, out of context"))
 	fmt.Fprintf(w, "  %-22s %s %s\n", "Returned to the agent:",
 		s.c(yellow, short(returned)), s.c(dim, "tokens, into context"))
@@ -155,14 +155,14 @@ func Render(w io.Writer, recs []Record, history bool) {
 	}
 
 	fmt.Fprintf(w, "\n%s\n", s.c(dim, line))
-	fmt.Fprintf(w, "  %-36s %s\n", "Spent on jev:", s.c(bold+green, money(spent)))
+	fmt.Fprintf(w, "  %-36s %s\n", "Spent on systemone:", s.c(bold+green, money(spent)))
 	if elsewhere > 0 && spent > 0 {
 		fmt.Fprintf(w, "  %-36s %s %s\n", "Same tokens at Opus 5 input rates:",
 			money(elsewhere), s.c(dim, fmt.Sprintf("(%.0f× more, read once)", elsewhere/spent)))
 	}
 
 	fmt.Fprintf(w, "\n%s\n", s.c(dim,
-		"  Examined counts what jev read on the agent's behalf. It is an upper\n"+
+		"  Examined counts what systemone read on the agent's behalf. It is an upper\n"+
 			"  bound on what the agent would otherwise have read, not a measured\n"+
 			"  saving — and the comparison above assumes those bytes entered the\n"+
 			"  context only once, when in practice they are re-read every turn."))

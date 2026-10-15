@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# Launcher for the systemone binary. The plugin ships this script, not a build:
+# on first use it downloads the release binary matching the plugin version,
+# verifies its checksum, caches it, and runs it. Later calls just exec the cache.
+#
+#   SYSTEMONE_BIN           run this binary instead (skips the download)
+#   SYSTEMONE_RELEASE_BASE  download from here instead of the GitHub release
+#   bin/systemone-local[.exe]   a `make build` binary, preferred when present
+set -u
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO="thesimpleassociate/systemone"
+
+FIRST_ARG="${1:-}"
+
+fail() {
+  echo "systemone: $*" >&2
+  # The Read hook must never block a Read: answer with the empty "pass through".
+  if [ "$FIRST_ARG" = "hook" ]; then
+    echo '{}'
+    exit 0
+  fi
+  exit 1
+}
+
+if [ -n "${SYSTEMONE_BIN:-}" ]; then
+  exec "$SYSTEMONE_BIN" "$@"
+fi
+
+for local in "$ROOT/bin/systemone-local" "$ROOT/bin/systemone-local.exe"; do
+  [ -x "$local" ] && exec "$local" "$@"
+done
+
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*) os=windows; ext=.exe ;;
+  Linux)                os=linux;   ext= ;;
+  Darwin)               os=darwin;  ext= ;;
+  *) fail "unsupported OS $(uname -s)" ;;
+esac
+case "$(uname -m)" in
+  x86_64|amd64)  arch=amd64 ;;
+  arm64|aarch64) arch=arm64 ;;
+  *) fail "unsupported architecture $(uname -m)" ;;
+esac
+
+version="$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' "$ROOT/.claude-plugin/plugin.json" | head -1)"
+[ -n "$version" ] || fail "cannot read the plugin version from .claude-plugin/plugin.json"
+
+cache="$ROOT/bin/.cache"
+bin="$cache/systemone-$version$ext"
+
+if [ ! -x "$bin" ]; then
+  asset="systemone_${os}_${arch}${ext}"
+  base="${SYSTEMONE_RELEASE_BASE:-https://github.com/$REPO/releases/download/v$version}"
+  mkdir -p "$cache" || fail "cannot create $cache"
+  tmp="$(mktemp "$cache/dl.XXXXXX")" || fail "cannot create a temp file in $cache"
+  trap 'rm -f "$tmp" "$tmp.sums"' EXIT
+
+  curl -fsSL --retry 2 --max-time 60 -o "$tmp" "$base/$asset" \
+    || fail "download failed: $base/$asset (is v$version released?)"
+  curl -fsSL --retry 2 --max-time 30 -o "$tmp.sums" "$base/checksums.txt" \
+    || fail "download failed: $base/checksums.txt"
+
+  # sha256sum may prefix the name with "*" (binary mode); accept both forms.
+  want="$(awk -v a="$asset" '{n=$2; sub(/^\*/,"",n)} n==a {print $1}' "$tmp.sums")"
+  if command -v sha256sum >/dev/null 2>&1; then
+    got="$(sha256sum "$tmp" | awk '{print $1}')"
+  else
+    got="$(shasum -a 256 "$tmp" | awk '{print $1}')"
+  fi
+  [ -n "$want" ] && [ "$want" = "$got" ] || fail "checksum mismatch for $asset"
+
+  chmod +x "$tmp" && mv -f "$tmp" "$bin" || fail "cannot install $bin"
+  rm -f "$tmp.sums"  # exec below skips the EXIT trap
+fi
+
+exec "$bin" "$@"
